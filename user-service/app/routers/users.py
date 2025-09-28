@@ -8,6 +8,7 @@ from app.database.connection import get_session
 import os
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from crud.user import get_current_user, verify_password, create_access_token
 # Create router
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -17,6 +18,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Password hashing with Argon2 (more reliable than bcrypt)
 ph = PasswordHasher()
+
+
 
 def hash_password(password: str) -> str:
     """Hash a password with Argon2"""
@@ -94,18 +97,10 @@ async def get_user(user_id: int, session: Session = Depends(get_session)):
     
     return user
 
-    # ***********************************************************************************************
-
-# JWT token creation
-def create_access_token(data: dict):
-    """Create JWT access token"""
-    to_encode = data.copy()
-    expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-    # ***********************************************************************************************
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """Get current user profile (protected route)"""
+    return current_user  
 
 #  user login endpoint
 
