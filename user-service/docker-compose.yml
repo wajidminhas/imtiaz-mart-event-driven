@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  user-db:
+    image: postgres:15
+    container_name: user-service-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - user-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build: .
+    container_name: user-service
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - user-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+volumes:
+  user_db_data:
+
+networks:
+  user-network:
+    driver: bridge

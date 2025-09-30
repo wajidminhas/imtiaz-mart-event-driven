@@ -15,8 +15,9 @@ class User(SQLModel, table=True):
     last_name: str = Field(min_length=1, max_length=50)
     is_active: bool = Field(default=True)
     is_verified: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = Field(default=None)
+    deleted_at: Optional[datetime] = Field(default=None)
 
 # Pydantic models for API requests/responses
 class UserCreate(SQLModel):
@@ -42,3 +43,22 @@ class UserResponse(SQLModel):
     is_active: bool
     is_verified: bool
     created_at: datetime
+
+class UserUpdate(SQLModel):
+    """Model for updating user profile"""
+    username: Optional[str] = Field(None, min_length=3, max_length=30, regex="^[a-zA-Z0-9_-]+$")
+    email: Optional[EmailStr] = None
+    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
+
+
+class PasswordChange(SQLModel):
+    """Model for changing password"""
+    old_password: str
+    new_password: str = Field(min_length=8, max_length=70)
+
+
+class DeleteAccount(SQLModel):
+    """Model for account deletion confirmation"""
+    password: str
+    confirm: bool = Field(description="Must be true to confirm deletion")
