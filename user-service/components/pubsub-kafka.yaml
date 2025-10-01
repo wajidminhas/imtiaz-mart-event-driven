@@ -1,0 +1,12 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+meta
+  name: kafka-pubsub
+spec:
+  type: pubsub.kafka
+  version: v1
+  meta
+    - name: brokers
+      value: "kafka:9092"
+    - name: consumerGroup
+      value: "user-service-group"

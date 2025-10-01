@@ -1,12 +1,12 @@
 import hashlib
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from app.models.user import User, UserCreate, UserResponse, UserLogin, UserUpdate, PasswordChange, DeleteAccount
 from app.database.connection import get_session
-
+from app.events.publishers import event_publisher  #
 from dotenv import load_dotenv
 import os
 from jose import JWTError, jwt
@@ -39,6 +39,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(
     user_data: UserCreate, 
+    background_tasks: BackgroundTasks,  # ✅ You already have this - good!
     session: Session = Depends(get_session)
 ):
     """Register a new user"""
@@ -84,6 +85,14 @@ async def register_user(
     
     # Create user using CRUD function
     new_user = create_user(session, user_data)
+    
+    # ✨ ADD THESE 2 LINES HERE (before return)
+    background_tasks.add_task(
+        event_publisher.publish_user_registered,
+        str(new_user.id),
+        new_user.username,
+        new_user.email
+    )
     
     return new_user
     # Rest of registration logic...

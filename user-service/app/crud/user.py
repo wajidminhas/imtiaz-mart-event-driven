@@ -5,9 +5,11 @@ from argon2 import PasswordHasher
 import os
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
-# from fastapi.security import HTTPAuthorizationCredentials, HHTPBearer
-# from database.connection import get_session
+# from app.proto.user_registered.pb2 import UserRegistered
+# from app.proto.user_registered_pb2 import 
 from datetime import datetime, timedelta
+import requests
+import time
 
 ph = PasswordHasher()
 
@@ -77,3 +79,5 @@ def get_active_user_by_id(session: Session, user_id: int) -> Optional[User]:
     if user and user.is_active:
         return user
     return None
+
+#********** EVENT PUBLISHING **********
