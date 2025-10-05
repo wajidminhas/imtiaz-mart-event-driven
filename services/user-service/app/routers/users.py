@@ -8,6 +8,7 @@ from app.models.user import User, UserCreate, UserResponse, UserLogin, UserUpdat
 from app.database.connection import get_session
 from app.events.publishers import event_publisher  #
 from dotenv import load_dotenv
+from app.events.publishers import publish_user_registered
 import os
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -86,6 +87,13 @@ async def register_user(
     # Create user using CRUD function
     new_user = create_user(session, user_data)
     
+
+
+    publish_user_registered(
+    user_id=str(user_data.id),
+    email=user_data.email,
+    full_name=user_data.full_name  # or whatever your field is named
+)
     # ✨ ADD THESE 2 LINES HERE (before return)
     background_tasks.add_task(
         event_publisher.publish_user_registered,
@@ -93,6 +101,7 @@ async def register_user(
         new_user.username,
         new_user.email
     )
+    
     
     return new_user
     # Rest of registration logic...

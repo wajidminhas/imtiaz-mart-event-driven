@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: imtiaz-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Don't set POSTGRES_DB here, we'll create multiple databases
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    networks:
+      - imtiaz-network
+
+
+  # Zookeeper (for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: imtiaz-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - imtiaz-network
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: imtiaz-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - imtiaz-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # User Service
+  user-service:
+    build: ../services/user-service
+    container_name: imtiaz-user-service
+    ports:
+      - "${USER_SERVICE_PORT}:8000"
+    environment:
+      # Override DATABASE_URL for container environment
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USER_DB_NAME}
+      
+      # Pass through from service .env (or set here)
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # Dapr config
+      DAPR_HTTP_PORT: 3500
+      DAPR_GRPC_PORT: 50001
+    depends_on:
+      - postgres
+      - kafka
+    networks:
+      - imtiaz-network
+      # Database
+ 
+
+  # Dapr Sidecar for User Service
+  user-service-dapr:
+    image: daprio/daprd:latest
+    container_name: imtiaz-user-service-dapr
+    command: [
+      "./daprd",
+      "-app-id", "user-service",
+      "-app-port", "8000",
+      "-dapr-http-port", "3500",
+      "-dapr-grpc-port", "50001",
+      "-components-path", "/components",
+      "-log-level", "info"
+    ]
+    volumes:
+      - ./dapr/components:/components:ro
+    depends_on:
+      - user-service
+    network_mode: "service:user-service"  # Share network with user-service
+
+volumes:
+  postgres_data:
+
+networks:
+  imtiaz-network:
+    driver: bridge

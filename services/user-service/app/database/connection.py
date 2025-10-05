@@ -6,11 +6,11 @@ load_dotenv()
 # Build DATABASE_URL from individual components if not provided
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    db_user = os.getenv("POSTGRES_USER", "postgres")
-    db_password = os.getenv("POSTGRES_PASSWORD", "password123")
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "5433")
-    db_name = os.getenv("POSTGRES_DB", "userdb")
+    db_user = os.getenv("POSTGRES_USER")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
+    db_name = os.getenv("POSTGRES_DB")
     DATABASE_URL = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 engine = create_engine(DATABASE_URL, echo=True, pool_pre_ping=True, pool_recycle=300)
