@@ -6,9 +6,8 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from app.models.user import User, UserCreate, UserResponse, UserLogin, UserUpdate, PasswordChange, DeleteAccount
 from app.database.connection import get_session
-from app.events.publishers import event_publisher  #
 from dotenv import load_dotenv
-from app.events.publishers import publish_user_registered
+from app.events.publishers import event_publisher
 import os
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -44,6 +43,8 @@ async def register_user(
     session: Session = Depends(get_session)
 ):
     """Register a new user"""
+    # At the top of register_user
+    # assert hasattr(user_data, 'id') is False, "UserCreate should not have 'id'"
     
     # Check for active users only
     existing_username = session.exec(
@@ -87,20 +88,25 @@ async def register_user(
     # Create user using CRUD function
     new_user = create_user(session, user_data)
     
-
-
-    publish_user_registered(
-    user_id=str(user_data.id),
-    email=user_data.email,
-    full_name=user_data.full_name  # or whatever your field is named
-)
-    # ✨ ADD THESE 2 LINES HERE (before return)
     background_tasks.add_task(
         event_publisher.publish_user_registered,
-        str(new_user.id),
-        new_user.username,
-        new_user.email
+        user_id=new_user.id,          # ✅ Correct: new_user has id
+        email=new_user.email,
+        first_name=new_user.first_name,
+        last_name=new_user.last_name
     )
+
+#    
+#     )
+   
+
+#     # ✨ ADD THESE 2 LINES HERE (before return)
+#     background_tasks.add_task(
+#         event_publisher.publish_user_registered,
+#         str(new_user.id),
+#         new_user.username,
+#         new_user.email
+#     )
     
     
     return new_user

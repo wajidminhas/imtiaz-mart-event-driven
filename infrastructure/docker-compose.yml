@@ -8,15 +8,19 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Don't set POSTGRES_DB here, we'll create multiple databases
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5436}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     networks:
       - imtiaz-network
-
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   # Zookeeper (for Kafka)
   zookeeper:
@@ -27,10 +31,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     networks:
       - imtiaz-network
+    restart: unless-stopped
 
   # Kafka
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: imtiaz-kafka
     depends_on:
       - zookeeper
@@ -39,43 +44,66 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
       - imtiaz-network
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   # User Service
   user-service:
-    build: ../services/user-service
+    build:
+      context: ../services/user-service
+      dockerfile: Dockerfile
     container_name: imtiaz-user-service
     ports:
-      - "${USER_SERVICE_PORT}:8000"
+      - "${USER_SERVICE_PORT:-8000}:8000"
     environment:
-      # Override DATABASE_URL for container environment
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USER_DB_NAME}
+      # Override DATABASE_URL for Docker environment
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USER_DB_NAME}?sslmode=disable
       
-      # Pass through from service .env (or set here)
-      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key}
-      ALGORITHM: ${ALGORITHM:-HS256}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      # Database connection
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - POSTGRES_DB=${USER_DB_NAME}
+      
+      # JWT Configuration
+      - SECRET_KEY=${USER_SERVICE_SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # Application
+      - APP_NAME=User Service
+      - DEBUG=${DEBUG:-False}
       
       # Dapr config
-      DAPR_HTTP_PORT: 3500
-      DAPR_GRPC_PORT: 50001
-    depends_on:
-      - postgres
-      - kafka
+      - DAPR_HTTP_PORT=3500
+      - DAPR_GRPC_PORT=50001
+      - PUBSUB_NAME=order-pubsub
+      
+      # Kafka
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     networks:
-      - imtiaz-network
-      # Database
- 
+    - imtiaz-network
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
 
   # Dapr Sidecar for User Service
   user-service-dapr:
@@ -94,7 +122,8 @@ services:
       - ./dapr/components:/components:ro
     depends_on:
       - user-service
-    network_mode: "service:user-service"  # Share network with user-service
+      - kafka  # Ensure Kafka is ready
+    restart: unless-stopped
 
 volumes:
   postgres_data:
