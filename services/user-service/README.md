@@ -155,11 +155,11 @@ POST /api/v1/users/register
 Content-Type: application/json
 
 {
-  "username": "johndoe",
-  "email": "john@example.com",
+  "username": "wajidminhas",
+  "email": "minhas@example.com",
   "password": "securepassword123",
-  "first_name": "John",
-  "last_name": "Doe"
+  "first_name": "wajid",
+  "last_name": "minhas"
 }
 ```
 
@@ -167,10 +167,10 @@ Content-Type: application/json
 ```json
 {
   "id": "uuid",
-  "username": "johndoe",
-  "email": "john@example.com",
-  "first_name": "John",
-  "last_name": "Doe",
+  "username": "wajidminhas",
+  "email": "minhas@example.com",
+  "first_name": "wajid",
+  "last_name": "minhas",
   "is_active": true,
   "created_at": "2025-10-08T12:00:00Z"
 }
@@ -207,8 +207,8 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "first_name": "John",
-  "last_name": "Smith"
+  "first_name": "wajid",
+  "last_name": "shabbir"
 }
 ```
 
@@ -372,9 +372,7 @@ dapr list
 - Payment Service
 - Notification Service
 
-## API Documentation
 
-Interactive API documentation available at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - OpenAPI Schema: `http://localhost:8000/openapi.json`
