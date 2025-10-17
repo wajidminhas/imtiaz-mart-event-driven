@@ -1,3 +1,22 @@
-infrastructure/.env*
+# Environment files
+infrastructure/.env
+services/*/.env
+.env
+```
 
-.env*
+---
+
+## ✅ Summary - What You Should Have
+```
+imtiaz-mart-event-driven/
+├── .gitignore  ← Contains: infrastructure/.env
+│
+├── infrastructure/
+│   ├── .env.example  ← Template (commit this)
+│   ├── .env          ← Real secrets (DON'T commit)
+│   ├── .gitignore    ← Contains: .env
+│   └── docker-compose.yml
+│
+└── services/
+    └── user-service/
+        └── .env.example  ← Template (optional, for local dev)
