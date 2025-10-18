@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package imtiazmart;
+
+message ProductCreated {
+  string product_id = 1;
+  string name = 2;
+  string description = 3;
+  double price = 4;
+  string category = 5;
+  string brand = 6;
+  repeated string tags = 7;
+  string image_url = 8;
+}

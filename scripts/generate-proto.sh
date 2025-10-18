@@ -4,9 +4,9 @@
 echo "Generating protobuf files..."
 
 # Generate in shared folder
-python -m grpc_tools.protoc \
+python3 -m grpc_tools.protoc \
     -I./shared/proto \
-    --python_out=./shared/proto \
+    --python_out=./shared/events \
     ./shared/proto/*.proto
 
 echo "Done! Generated files in shared/proto/"
