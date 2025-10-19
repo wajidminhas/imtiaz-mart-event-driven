@@ -13,7 +13,7 @@ class ProductService:
         product = Product(name, description, price, category, brand, tags or [])
         
         # 2. Save to DB (returns model with ID)
-        product_model = self.repo.save(product)
+        product_model = self.repo.create(product)
         
         # 3. Emit event
         event = ProductCreated(

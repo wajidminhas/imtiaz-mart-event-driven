@@ -8,5 +8,7 @@ spec:
   meta
     - name: brokers
       value: "kafka:9092"
-    - name: consumerGroup
-      value: "user-service-group"
+
+      # you can remove because it is its default behavior
+    # - name: consumerGroup
+    #   value: "user-service-group"
