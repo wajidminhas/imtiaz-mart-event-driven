@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import Optional
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.models.product import ProductModel
 from app.domain.product import Product
 
@@ -62,3 +62,10 @@ class ProductRepository:
         self.session.commit()
         self.session.refresh(product)
         return product
+    def list_all(self, category_id: str | None = None, is_active: bool | None = True) -> list[ProductModel]:
+        statement = select(ProductModel)
+        if category_id:
+            statement = statement.where(ProductModel.category_id == category_id)
+        if is_active is not None:
+            statement = statement.where(ProductModel.is_active == is_active)
+        return self.session.exec(statement).all()

@@ -1,0 +1,14 @@
+
+
+syntax = "proto3";
+
+package imtiazmart; // Or your preferred package name
+
+message CategoryCreated {
+  string category_id = 1;
+  string name = 2;
+  string description = 3;
+  bool is_active = 4; // Include relevant fields
+  string created_at = 5; // ISO 8601 string representation
+  // Add other fields if necessary
+}
