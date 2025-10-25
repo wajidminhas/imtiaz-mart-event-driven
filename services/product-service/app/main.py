@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from app.database import create_db_and_tables
 # from app.api.products import router as products_router
 from app.api.product import router as products_router
+from app.api.categories import router as categories_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +24,7 @@ app = FastAPI(
 )
 
 app.include_router(products_router, prefix="/api/v1")
+app.include_router(categories_router, prefix="/api/v1")
 
 app.add_middleware(
     CORSMiddleware,
