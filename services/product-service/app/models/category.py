@@ -1,20 +1,21 @@
+# services/product-service/app/models/category_model.py (or category.py)
 
-
-# Using SQLModel (like your ProductModel)
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
-import uuid
+from typing import Optional, TYPE_CHECKING
+import uuid as uuid4
 from datetime import datetime, timezone
-from .product import ProductModel
+
+if TYPE_CHECKING:
+    # Import ProductModel for type checking only
+    from .product import ProductModel # Adjust path if file is named product.py
 
 class CategoryModel(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    name: str = Field(sa_column_kwargs={"unique": True}) # e.g., "Dairy", "Bakery" - Should be unique
-    description: Optional[str] = None # e.g., "Fresh milk, eggs, cheese"
-    # parent_id: Optional[str] = Field(default=None, foreign_key="categorymodel.id") # For subcategories (e.g., Dairy -> Milk -> Cow's Milk)
-    is_active: bool = True # To enable/disable categories without deleting
-
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    name: str = Field(sa_column_kwargs={"unique": True})
+    description: Optional[str] = None
+    is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    deleted_at: Optional[datetime] = None # If soft-deleted
-    products: list["ProductModel"] = Relationship(back_populates="category") # Links back to ProductModel
+    deleted_at: Optional[datetime] = None
+    # Use string annotation for the relationship
+    products: list["ProductModel"] = Relationship(back_populates="category")
