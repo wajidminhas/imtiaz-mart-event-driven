@@ -1,15 +1,17 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
 
+load_dotenv()
 
 class Settings(BaseSettings):
     """Application settings - loads from environment variables"""
     
     # Database Configuration
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/product_db"
-    
+    database_url: str    
     # API Configuration
     app_name: str = "Product Service"
     debug: bool = True
+    service_port: int = 8001
     
     # Dapr Configuration
     dapr_http_port: int = 3500
@@ -18,7 +20,9 @@ class Settings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=False
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
     )
 
 
