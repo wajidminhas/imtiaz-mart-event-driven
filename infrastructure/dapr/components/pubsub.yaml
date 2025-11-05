@@ -1,0 +1,30 @@
+
+
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:  # ← Fix: was "meta" (incomplete)
+  name: imtiaz-pubsub  # ← Fix: match Python config
+  namespace: default
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:  # ← Fix: was "meta" (incomplete)
+    # Kafka broker
+    - name: brokers
+      value: "kafka:9092"
+    
+    # Consumer group
+    - name: consumerGroup
+      value: "product-service-group"
+    
+    # Client ID
+    - name: clientId
+      value: "product-service"
+    
+    # Allow auto-create topics
+    - name: allowAutoCreate
+      value: "true"
+    
+    # Authentication (none for local dev)
+    - name: authType
+      value: "none"

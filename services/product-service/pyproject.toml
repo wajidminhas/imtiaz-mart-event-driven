@@ -7,7 +7,10 @@ requires-python = ">=3.10"
 dependencies = [
     "alembic>=1.17.1",
     "dapr>=1.16.0",
+    "dapr-ext-grpc>=1.16.0",
     "fastapi>=0.120.2",
+    "grpcio-tools>=1.76.0",
+    "protobuf>=6.33.0",
     "psycopg2-binary>=2.9.11",
     "pydantic-settings>=2.11.0",
     "python-dotenv>=1.2.1",
