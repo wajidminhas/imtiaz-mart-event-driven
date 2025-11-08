@@ -1,142 +1,160 @@
 version: '3.8'
 
-services:
-  # ... (zookeeper, kafka remain the same) ...
+networks:
+  imtiaz-network:
+    driver: bridge
 
-  # PostgreSQL Database for Product Service
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: imtiaz-zookeeper
+    networks:
+      - imtiaz-network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: imtiaz-kafka
+    networks:
+      - imtiaz-network
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
   product-db:
     image: postgres:15-alpine
     container_name: imtiaz-product-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER} # e.g., 'imtiaz'
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # e.g., 'secure_password'
-      POSTGRES_DB: ${PRODUCT_DB_NAME} # e.g., 'productdb' - This DB will be created automatically
-    ports:
-      # Map to a unique host port for local access if needed (e.g., for debugging)
-      - "5437:5432"
-    volumes:
-      # Volume for data persistence for this specific DB instance
-      - product_db_/var/lib/postgresql/data
-      # Optional: Initialization script specific to this DB (if needed)
-      # - ./infrastructure/postgres/product-init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - imtiaz-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imtiaz} -d ${PRODUCT_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # PostgreSQL Database for User Service (as an example)
-  user-db:
-    image: postgres:15-alpine
-    container_name: imtiaz-user-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${USER_DB_NAME} # e.g., 'userdb'
+      POSTGRES_DB: ${PRODUCT_DB_NAME}
     ports:
-      - "5436:5432" # Different host port
+      - "5437:5432"
     volumes:
-      - user_db_data:/var/lib/postgresql/data
-    networks:
-      - imtiaz-network
+      - product_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imtiaz} -d ${USER_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${PRODUCT_DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # Product Service
+  user-db:
+    image: postgres:15-alpine
+    container_name: imtiaz-user-db
+    networks:
+      - imtiaz-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${USER_DB_NAME}
+    ports:
+      - "5436:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${USER_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ========================================
+  # PRODUCT SERVICE (FIXED)
+  # ========================================
   product-service:
     build:
-      context: ./services/product-service # Adjust path if necessary
+      context: ../services/product-service
       dockerfile: Dockerfile
     container_name: imtiaz-product-service
+    networks:
+      - imtiaz-network
     ports:
-      - "${PRODUCT_SERVICE_PORT:-8001}:8000" # Expose on a different port
+      - "${PRODUCT_SERVICE_PORT:-8001}:8001"  # ✅ Fixed: 8001:8001
     environment:
-      # --- CORRECTED: Point to its dedicated DB instance using the SERVICE NAME ---
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_HOST=product-db # Service name of *its own* dedicated DB
-      - DB_PORT=5432
-      # PRODUCT_DB_NAME is not strictly needed here if the app code just connects to the DB specified by DB_HOST/PORT
-      # and the DB service itself (product-db) has POSTGRES_DB set correctly.
-      # However, if your app code constructs the DATABASE_URL dynamically, you might pass PRODUCT_DB_NAME too:
-      # - POSTGRES_DB=${PRODUCT_DB_NAME} # Optional, if app constructs URL like f"postgresql://{user}:{pw}@{host}:{port}/{db}"
-      # Or, explicitly override DATABASE_URL if needed by the app:
-      # - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_DB_NAME}?sslmode=disable
-      # --- END CORRECTION ---
-      # Application (Generic settings)
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_DB_NAME}
       - APP_NAME=Product Service
-      - DEBUG=${DEBUG:-False}
-      # Dapr config (if needed by the application logic)
-      # No need to set KAFKA_BOOTSTRAP_SERVERS here if using Dapr pubsub
-    networks:
-      - imtiaz-network
+      - DEBUG=${DEBUG:-true}  # ✅ true for development
+      - DAPR_HTTP_PORT=3501
+      - DAPR_GRPC_PORT=50002
+      - PUBSUB_NAME=imtiaz-pubsub
     depends_on:
-      product-db: # Depend on its *own* DB
-        condition: service_healthy
-      kafka: # Still needs Kafka for events
-        condition: service_healthy
-    restart: unless-stopped
-
-  # Dapr Sidecar for Product Service
-  product-service-dapr:
-    image: daprio/daprd:latest
-    container_name: imtiaz-product-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "product-service", # Unique app ID
-      "-app-port", "8000",          # Port the app listens on inside the container
-      "-dapr-http-port", "3500",
-      "-dapr-grpc-port", "50001",
-      "-components-path", "/components",
-      "-log-level", "info"
-    ]
-    volumes:
-      - ./infrastructure/dapr/components:/components:ro # Ensure path is correct
-    depends_on:
-      - product-service
-      - kafka  # Dapr sidecar might interact with Kafka if configured via components
-    network_mode: "service:product-service" # Share network namespace with the app container
-    restart: unless-stopped
-
-  # User Service (Example - now uses its own dedicated DB)
-  user-service:
-    build:
-      context: ./services/user-service
-      dockerfile: Dockerfile
-    container_name: imtiaz-user-service
-    ports:
-      - "${USER_SERVICE_PORT:-8000}:8000"
-    environment:
-      # --- CORRECTED: Point to its dedicated DB instance using the SERVICE NAME ---
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_HOST=user-db # Service name of *its own* dedicated DB
-      - DB_PORT=5432
-      # USER_DB_NAME is not strictly needed here if the app code just connects to the DB specified by DB_HOST/PORT
-      # and the DB service itself (user-db) has POSTGRES_DB set correctly.
-      # However, if your app code constructs the DATABASE_URL dynamically, you might pass USER_DB_NAME too:
-      # - POSTGRES_DB=${USER_DB_NAME} # Optional
-      # Or, explicitly override DATABASE_URL if needed by the app:
-      # - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${USER_DB_NAME}?sslmode=disable
-      # --- END CORRECTION ---
-      # ... other user service specific env vars ...
-    networks:
-      - imtiaz-network
-    depends_on:
-      user-db: # Depend on its *own* DB
+      product-db:
         condition: service_healthy
       kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # Dapr Sidecar for User Service
+  product-service-dapr:
+    image: daprio/daprd:latest
+    container_name: imtiaz-product-service-dapr
+    command: [
+      "./daprd",
+      "-app-id", "product-service",
+      "-app-port", "8001",  # ✅ Fixed: Changed to 8001
+      "-dapr-http-port", "3501",
+      "-dapr-grpc-port", "50002",
+      "-components-path", "/components",
+      "-config", "/config/config.yaml",  # ✅ Added config
+      "-log-level", "debug"  # ✅ Changed to debug for troubleshooting
+    ]
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config.yaml:/config/config.yaml:ro  # ✅ Added config volume
+    depends_on:
+      - product-service
+      - kafka
+    network_mode: "service:product-service"
+    restart: unless-stopped
+
+  # ========================================
+  # USER SERVICE
+  # ========================================
+  user-service:
+    build:
+      context: ../services/user-service
+      dockerfile: Dockerfile
+    container_name: imtiaz-user-service
+    networks:
+      - imtiaz-network
+    ports:
+      - "${USER_SERVICE_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${USER_DB_NAME}
+      - APP_NAME=User Service
+      - DEBUG=${DEBUG:-true}  # ✅ Changed to true for dev
+      - DAPR_HTTP_PORT=3500
+      - DAPR_GRPC_PORT=50001
+      - PUBSUB_NAME=imtiaz-pubsub
+    depends_on:
+      user-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
   user-service-dapr:
     image: daprio/daprd:latest
     container_name: imtiaz-user-service-dapr
@@ -147,74 +165,18 @@ services:
       "-dapr-http-port", "3500",
       "-dapr-grpc-port", "50001",
       "-components-path", "/components",
-      "-log-level", "info"
+      "-config", "/config/config.yaml",  # ✅ Added config
+      "-log-level", "debug"  # ✅ Changed to debug
     ]
     volumes:
-      - ./infrastructure/dapr/components:/components:ro
+      - ./dapr/components:/components:ro
+      - ./dapr/config.yaml:/config/config.yaml:ro  # ✅ Added config volume
     depends_on:
       - user-service
       - kafka
-    network_mode: "service:user-service" # Share network namespace with the app container
+    network_mode: "service:user-service"
     restart: unless-stopped
 
-  # Example: Order Service (Add similar blocks for Inventory, Payment, etc.)
-  # order-db:
-  #   image: postgres:15-alpine
-  #   container_name: imtiaz-order-db
-  #   environment:
-  #     POSTGRES_USER=...
-  #     POSTGRES_PASSWORD=...
-  #     POSTGRES_DB=${ORDER_DB_NAME} # e.g., 'orderdb'
-  #   ports:
-  #     - "5438:5432" # Different host port
-  #   volumes:
-  #     - order_db_/var/lib/postgresql/data
-  #   networks:
-  #     - imtiaz-network
-  #   healthcheck: ...
-  #   restart: unless-stopped
-  #
-  # order-service:
-  #   build: ...
-  #   container_name: ...
-  #   ports: ...
-  #   environment:
-  #     # --- CORRECTED: Point to its dedicated DB instance using the SERVICE NAME ---
-  #     - POSTGRES_USER=...
-  #     - POSTGRES_PASSWORD=...
-  #     - DB_HOST=order-db # Service name of *its own* dedicated DB
-  #     - DB_PORT=5432
-  #     # ORDER_DB_NAME is not strictly needed here if the app code just connects to the DB specified by DB_HOST/PORT
-  #     # and the DB service itself (order-db) has POSTGRES_DB set correctly.
-  #     # Or, explicitly override DATABASE_URL if needed by the app:
-  #     # - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@order-db:5432/${ORDER_DB_NAME}?sslmode=disable
-  #     # --- END CORRECTION ---
-  #     # ... other env vars ...
-  #   networks:
-  #     - imtiaz-network
-  #   depends_on:
-  #     order-db: # Depend on its *own* DB
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-  #
-  # order-service-dapr:
-  #   image: ...
-  #   container_name: ...
-  #   command: ...
-  #   volumes: ...
-  #   depends_on:
-  #     - order-service
-  #     - kafka
-  #   network_mode: "service:order-service"
-  #   restart: unless-stopped
-
 volumes:
-  - product_db_ # Named volume for product DB persistence
-  - user_db_    # Named volume for user DB persistence
-  # order_db_data: # Named volume for order DB persistence (add as needed)
-
-networks:
-  imtiaz-network:
-    driver: bridge
+  product_db_data:
+  user_db_data:
