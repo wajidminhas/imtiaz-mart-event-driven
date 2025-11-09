@@ -88,6 +88,10 @@ services:
     build:
       context: ../services/product-service
       dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+        BUILD_DATE: "2025-11-09"
+    image: imtiaz-mart/product-service:1.0.0
     container_name: imtiaz-product-service
     networks:
       - imtiaz-network
@@ -100,6 +104,8 @@ services:
       - DAPR_HTTP_PORT=3501
       - DAPR_GRPC_PORT=50002
       - PUBSUB_NAME=imtiaz-pubsub
+    volumes:
+      - ../services/product-service/uv.lock:/app/uv.lock
     depends_on:
       product-db:
         condition: service_healthy
@@ -136,6 +142,9 @@ services:
     build:
       context: ../services/user-service
       dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+    image: imtiaz-mart/user-service:1.0.0
     container_name: imtiaz-user-service
     networks:
       - imtiaz-network
@@ -148,6 +157,8 @@ services:
       - DAPR_HTTP_PORT=3500
       - DAPR_GRPC_PORT=50001
       - PUBSUB_NAME=imtiaz-pubsub
+    volumes:
+      - ../services/user-service/uv.lock:/app/uv.lock
     depends_on:
       user-db:
         condition: service_healthy
