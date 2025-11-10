@@ -1,5 +1,3 @@
-
-
 """
 Event Publisher using Dapr Pub/Sub
 
@@ -7,94 +5,82 @@ Publishes events to Kafka via Dapr sidecar
 Dapr handles: connection, retries, error handling
 """
 
-from dapr.clients import DaprClient
-from google.protobuf.json_format import MessageToDict
 import json
 from typing import Any
 from app.config import settings
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 
 class EventPublisher:
     """
     Event Publisher - Publishes events to Kafka via Dapr
-    
+
     Pattern: Singleton (one instance for entire service)
     """
-    
+
     def __init__(self):
-        """Initialize Dapr client"""
+        """Initialize Dapr endpoint"""
         self.pubsub_name = settings.pubsub_name  # "imtiaz-pubsub" from .env
-        self.dapr_client = None
-    
-    def _get_client(self) -> DaprClient:
-        """
-        Get or create Dapr client (lazy initialization)
-        
-        Why lazy? 
-        - Don't create connection until needed
-        - Avoid connection errors during testing
-        """
-        if self.dapr_client is None:
-            self.dapr_client = DaprClient()
-        return self.dapr_client
-    
-    async def publish_event(
-        self, 
-        topic: str, 
+        # Dapr sidecar HTTP endpoint (default port for Dapr HTTP API)
+        self.dapr_http_endpoint = f"http://localhost:3501"  # Dapr default HTTP port
+
+    def publish_event(
+        self,
+        topic: str,
         event_data: Any,
         use_protobuf: bool = False
     ) -> bool:
         """
-        Publish event to Kafka via Dapr
-        
+        Publish event to Kafka via Dapr using HTTP API
+
         Args:
             topic: Kafka topic name (e.g., "product.created")
             event_data: Event data (dict or Protobuf message)
             use_protobuf: If True, event_data is Protobuf message
-        
+
         Returns:
             True if published successfully, False otherwise
-        
+
         Example:
-            await publisher.publish_event(
+            publisher.publish_event(
                 topic="product.created",
                 event_data={"product_id": 1, "name": "Laptop"}
             )
         """
         try:
-            client = self._get_client()
-            
-            # Convert Protobuf to dict if needed
-            if use_protobuf:
-                event_dict = MessageToDict(event_data)
-            else:
-                event_dict = event_data
-            
             # Convert to JSON string
-            event_json = json.dumps(event_dict)
-            
-            # Publish to Dapr
-            # Dapr will forward to Kafka
-            client.publish_event(
-                pubsub_name=self.pubsub_name,
-                topic_name=topic,
-                data=event_json,
-                data_content_type="application/json"
+            event_json = json.dumps(event_data)
+
+            # Create the request URL to Dapr sidecar HTTP endpoint
+            url = f"{self.dapr_http_endpoint}/v1.0/publish/{self.pubsub_name}/{topic}"
+
+            # Create the HTTP request
+            req = Request(
+                url=url,
+                data=event_json.encode('utf-8'),
+                headers={
+                    "Content-Type": "application/json"
+                },
+                method="POST"
             )
-            
-            print(f"✅ Published event to topic: {topic}")
-            print(f"   Data: {event_dict}")
-            return True
-            
+
+            # Make HTTP POST request to Dapr sidecar
+            with urlopen(req) as response:
+                if response.status == 200:
+                    print(f"✅ Published event to topic: {topic}")
+                    print(f"   Data: {event_data}")
+                    return True
+                else:
+                    print(f"❌ Failed to publish event to {topic}: HTTP {response.status}")
+                    return False
+
+        except URLError as e:
+            print(f"❌ Failed to publish event to {topic}: {str(e)}")
+            return False
         except Exception as e:
             print(f"❌ Failed to publish event to {topic}: {str(e)}")
             return False
-    
-    def close(self):
-        """Close Dapr client connection"""
-        if self.dapr_client:
-            self.dapr_client.close()
-            self.dapr_client = None
 
 
 # Singleton instance
@@ -102,36 +88,36 @@ event_publisher = EventPublisher()
 
 
 # Helper functions for specific events
-async def publish_product_created(product_data: dict) -> bool:
+def publish_product_created(product_data: dict) -> bool:
     """
     Publish Product Created Event
-    
+
     Topic: product.created
     Consumers: Inventory Service, Order Service
     """
-    return await event_publisher.publish_event(
+    return event_publisher.publish_event(
         topic="product.created",
         event_data=product_data
     )
 
 
-async def publish_product_updated(product_data: dict) -> bool:
+def publish_product_updated(product_data: dict) -> bool:
     """
     Publish Product Updated Event
-    
+
     Topic: product.updated
     Consumers: Inventory Service, Order Service
     """
-    return await event_publisher.publish_event(
+    return event_publisher.publish_event(
         topic="product.updated",
         event_data=product_data
     )
 
 
-async def publish_product_deleted(product_id: int, product_name: str) -> bool:
+def publish_product_deleted(product_id: int, product_name: str) -> bool:
     """
     Publish Product Deleted Event
-    
+
     Topic: product.deleted
     Consumers: Inventory Service, Order Service
     """
@@ -140,8 +126,8 @@ async def publish_product_deleted(product_id: int, product_name: str) -> bool:
         "name": product_name,
         "deleted_at": None  # Will add timestamp in service
     }
-    
-    return await event_publisher.publish_event(
+
+    return event_publisher.publish_event(
         topic="product.deleted",
         event_data=event_data
     )

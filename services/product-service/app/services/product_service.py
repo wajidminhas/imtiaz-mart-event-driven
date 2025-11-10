@@ -71,7 +71,7 @@ class ProductService:
                 "is_active": product.is_active,
                 "created_at": product.created_at.isoformat()
             }
-            await publish_product_created(event_data)
+            publish_product_created(event_data)
             
             return ProductRead.model_validate(product)
         
@@ -148,7 +148,7 @@ class ProductService:
     #     return ProductRead.model_validate(updated_product)
     
     
-    async def update_product(self, product_id: int, product_data: ProductUpdate) -> ProductRead:
+    def update_product(self, product_id: int, product_data: ProductUpdate) -> ProductRead:
         """Update product with business logic"""
         # ... existing code ...
         
@@ -171,11 +171,11 @@ class ProductService:
             "is_active": updated_product.is_active,
             "updated_at": updated_product.updated_at.isoformat()
         }
-        await publish_product_updated(event_data)
+        publish_product_updated(event_data)
         
         return ProductRead.model_validate(updated_product)
     
-    async def delete_product(self, product_id: int) -> dict:
+    def delete_product(self, product_id: int) -> dict:
         """Soft delete product"""
         # Get product details before deletion
         product = self.repository.get_by_id(product_id)
@@ -195,7 +195,7 @@ class ProductService:
             )
         
         # Publish product.deleted event 🔥 NEW!
-        await publish_product_deleted(product_id, product.name)
+        publish_product_deleted(product_id, product.name)
         
         return {
             "message": f"Product {product_id} deleted successfully",
