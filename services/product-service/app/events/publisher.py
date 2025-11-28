@@ -9,7 +9,7 @@ import json
 from typing import Any
 from app.config import settings
 from urllib.request import Request, urlopen
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 
 
 class EventPublisher:
@@ -67,7 +67,8 @@ class EventPublisher:
 
             # Make HTTP POST request to Dapr sidecar
             with urlopen(req) as response:
-                if response.status == 200:
+                # ✅ FIX: Dapr returns 204 No Content on success, not 200
+                if response.status in (200, 204):
                     print(f"✅ Published event to topic: {topic}")
                     print(f"   Data: {event_data}")
                     return True
@@ -75,8 +76,13 @@ class EventPublisher:
                     print(f"❌ Failed to publish event to {topic}: HTTP {response.status}")
                     return False
 
+        except HTTPError as e:
+            # HTTP errors (4xx, 5xx)
+            print(f"❌ Failed to publish event to {topic}: HTTP Error {e.code}: {e.reason}")
+            return False
         except URLError as e:
-            print(f"❌ Failed to publish event to {topic}: {str(e)}")
+            # Connection errors
+            print(f"❌ Failed to publish event to {topic}: Connection Error: {e.reason}")
             return False
         except Exception as e:
             print(f"❌ Failed to publish event to {topic}: {str(e)}")
