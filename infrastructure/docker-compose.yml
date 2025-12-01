@@ -188,7 +188,84 @@ services:
       - kafka
     network_mode: "service:user-service"
     restart: unless-stopped
+  # ========================================
+  # ORDER DATABASE
+  # ========================================
+  order-db:
+    image: postgres:15-alpine
+    container_name: imtiaz-order-db
+    networks:
+      - imtiaz-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${ORDER_DB_NAME}
+    ports:
+      - "5438:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${ORDER_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ========================================
+  # ORDER SERVICE
+  # ========================================
+  order-service:
+    build:
+      context: ../services/order-service
+      dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+        BUILD_DATE: "2025-11-29"
+    image: imtiaz-mart/order-service:1.0.0
+    container_name: imtiaz-order-service
+    networks:
+      - imtiaz-network
+    ports:
+      - "${ORDER_SERVICE_PORT:-8003}:8003"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@order-db:5432/${ORDER_DB_NAME}
+      - APP_NAME=Order Service
+      - DEBUG=${DEBUG:-true}
+      - DAPR_HTTP_PORT=3503
+      - DAPR_GRPC_PORT=50004
+      - PUBSUB_NAME=imtiaz-pubsub
+    volumes:
+      - ../services/order-service/uv.lock:/app/uv.lock
+    depends_on:
+      order-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  order-service-dapr:
+    image: daprio/daprd:latest
+    container_name: imtiaz-order-service-dapr
+    command: [
+      "./daprd",
+      "-app-id", "order-service",
+      "-app-port", "8003",
+      "-dapr-http-port", "3503",
+      "-dapr-grpc-port", "50004",
+      "-components-path", "/components",
+      "-config", "/config/config.yaml",
+      "-log-level", "info"
+    ]
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config.yaml:/config/config.yaml:ro
+    depends_on:
+      - order-service
+      - kafka
+    network_mode: "service:order-service"
+    restart: unless-stopped
 
 volumes:
   product_db_data:
   user_db_data:
+  order_db_data:
