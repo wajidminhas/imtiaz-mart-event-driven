@@ -56,7 +56,7 @@ class Order(OrderBase, table=True):
 
 class OrderItemBase(SQLModel):
     """Base Order Item Schema"""
-    product_id: int = Field(foreign_key="products.id")
+    product_id: int = Field()  # Remove foreign_key for flexibility
     product_name: str = Field(max_length=255)  # Store name for history
     quantity: int = Field(gt=0)
     price_per_unit: float = Field(gt=0)  # Store price at time of order

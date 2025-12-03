@@ -64,10 +64,10 @@ def test_get_all_orders(client, create_sample_order):
 
 def test_get_orders_with_status_filter(client, create_sample_order):
     """Test GET /orders/ with status filter"""
-    # Create orders with different statuses
-    create_sample_order(status=OrderStatus.PENDING)
-    create_sample_order(status=OrderStatus.CONFIRMED)
-    create_sample_order(status=OrderStatus.PENDING)
+    # Create orders with different statuses AND unique order numbers
+    create_sample_order(status=OrderStatus.PENDING, order_number="ORD-F1")
+    create_sample_order(status=OrderStatus.CONFIRMED, order_number="ORD-F2")
+    create_sample_order(status=OrderStatus.PENDING, order_number="ORD-F3")
     
     # Get only pending orders
     response = client.get("/orders/?status=pending")
