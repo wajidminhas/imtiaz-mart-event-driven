@@ -8,8 +8,8 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml ./
 
-# Install dependencies
-RUN uv sync --frozen --no-dev
+# Install dependencies - uv will create .venv automatically
+RUN uv sync --no-dev
 
 # Copy application code
 COPY . .

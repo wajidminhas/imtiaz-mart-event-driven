@@ -35,7 +35,7 @@ class OrderService:
         OOP Principle: Service depends on abstraction (repository)
         """
         self.repository = repository
-        self.product_service_url = "http://localhost:3501/v1.0/invoke/product-service/method"
+        self.product_service_url = "http://localhost:3503/v1.0/invoke/product-service/method"
     
     async def verify_product(self, product_id: int) -> dict:
         """
@@ -110,7 +110,7 @@ class OrderService:
     
     def generate_order_number(self) -> str:
         """Generate unique order number"""
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         return f"ORD-{timestamp}"
     
     async def create_order(self, order_data: OrderCreate) -> OrderRead:
