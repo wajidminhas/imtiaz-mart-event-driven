@@ -11,13 +11,22 @@ class InventoryDatabase:
     
     def __init__(self):
         """Initialize inventory database engine"""
-        self.engine = create_engine(
-            settings.database_url,
-            echo=settings.debug,
-            pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10
-        )
+        # Check if using SQLite (for tests)
+        if settings.database_url.startswith("sqlite"):
+            self.engine = create_engine(
+                settings.database_url,
+                echo=settings.debug,
+                connect_args={"check_same_thread": False}
+            )
+        else:
+            # PostgreSQL configuration
+            self.engine = create_engine(
+                settings.database_url,
+                echo=settings.debug,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10
+            )
     
     def create_tables(self):
         """Create all inventory-related tables (inventory + stock_movements)"""
