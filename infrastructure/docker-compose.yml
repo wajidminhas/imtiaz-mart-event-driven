@@ -264,8 +264,86 @@ services:
       - kafka
     network_mode: "service:order-service"
     restart: unless-stopped
+  
+  # ========================================
+  # INVENTORY DATABASE
+  # ========================================
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: imtiaz-inventory-db
+    networks:
+      - imtiaz-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${INVENTORY_DB_NAME}
+    ports:
+      - "5439:5432"
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${INVENTORY_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ========================================
+  # INVENTORY SERVICE
+  # ========================================
+  inventory-service:
+    build:
+      context: ../services/inventory-service
+      dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+        BUILD_DATE: "2025-12-11"
+    image: imtiaz-mart/inventory-service:1.0.0
+    container_name: imtiaz-inventory-service
+    networks:
+      - imtiaz-network
+    ports:
+      - "${INVENTORY_SERVICE_PORT:-8004}:8004"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@inventory-db:5432/${INVENTORY_DB_NAME}
+      - APP_NAME=Inventory Service
+      - DEBUG=${DEBUG:-true}
+      - DAPR_HTTP_PORT=3504
+      - DAPR_GRPC_PORT=50005
+      - PUBSUB_NAME=imtiaz-pubsub
+    volumes:
+      - ../services/inventory-service/uv.lock:/app/uv.lock
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  inventory-service-dapr:
+    image: daprio/daprd:latest
+    container_name: imtiaz-inventory-service-dapr
+    command: [
+      "./daprd",
+      "-app-id", "inventory-service",
+      "-app-port", "8004",
+      "-dapr-http-port", "3504",
+      "-dapr-grpc-port", "50005",
+      "-components-path", "/components",
+      "-config", "/config/config.yaml",
+      "-log-level", "info"
+    ]
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config.yaml:/config/config.yaml:ro
+    depends_on:
+      - inventory-service
+      - kafka
+    network_mode: "service:inventory-service"
+    restart: unless-stopped
 
 volumes:
   product_db_data:
   user_db_data:
   order_db_data:
+  inventory_db_data:
