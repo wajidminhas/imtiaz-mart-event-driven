@@ -144,7 +144,7 @@ class InventoryRepository:
     
     def create_stock_movement(self, movement_data: StockMovementCreate) -> StockMovement:
         """Create stock movement record (audit trail)"""
-        movement = StockMovement.model_validate(movement_data)
+        movement = StockMovement(**movement_data.model_dump())
         self.session.add(movement)
         self.session.commit()
         self.session.refresh(movement)

@@ -86,7 +86,7 @@ def test_create_stock_movement(session):
     
     movement_data = StockMovementCreate(
         product_id=1,
-        product_name="Test Product",
+        product_name="Test Product",  # Added this
         movement_type=StockMovementType.IN,
         quantity=50,
         notes="Restock"

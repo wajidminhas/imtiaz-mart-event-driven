@@ -104,11 +104,11 @@ class InventoryRead(InventoryBase):
 class StockMovementCreate(SQLModel):
     """Schema for creating stock movement"""
     product_id: int
+    product_name: str  # Add this line
     movement_type: StockMovementType
     quantity: int
     order_id: Optional[int] = None
     notes: Optional[str] = None
-
 
 class StockMovementRead(StockMovementBase):
     """Schema for reading stock movement"""

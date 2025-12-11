@@ -58,11 +58,11 @@ class InventoryService:
             if inventory.quantity > 0:
                 movement = StockMovementCreate(
                     product_id=inventory.product_id,
-                    product_name=inventory.product_name,
+                    product_name=inventory.product_name,  # This line should be there
                     movement_type=StockMovementType.IN,
                     quantity=inventory.quantity,
                     notes="Initial stock"
-                )
+                     )
                 self.repository.create_stock_movement(movement)
             
             return self._to_inventory_read(inventory)
