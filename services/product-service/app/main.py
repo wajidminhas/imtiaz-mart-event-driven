@@ -3,7 +3,7 @@
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import product_db
 from app.routers import product_router
@@ -43,6 +43,13 @@ app = FastAPI(
 
 # Include routers
 app.include_router(product_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/", tags=["Health"])

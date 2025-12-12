@@ -105,7 +105,7 @@ services:
       - DAPR_GRPC_PORT=50002
       - PUBSUB_NAME=imtiaz-pubsub
     volumes:
-      - ../services/product-service/uv.lock:/app/uv.lock
+      - ../services/product-service:/app
     depends_on:
       product-db:
         condition: service_healthy
