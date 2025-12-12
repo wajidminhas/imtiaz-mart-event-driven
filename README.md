@@ -119,7 +119,7 @@ graph TB
 ## 🚀 Quick Start
 ```bash
 # Clone repository
-git clone <your-repo-url>
+git clone <https://github.com/wajidminhas/imtiaz-mart-event-driven>
 cd imtiaz-mart-event-driven
 
 # Start all services
@@ -226,9 +226,9 @@ MIT License
 
 ## 👨‍💻 Author
 
-**Your Name**
-- GitHub: [@yourusername]
-- Email: your.email@example.com
+**Wajid Shabbir Minhas**
+- GitHub: [@wajidminhas]
+- Email: shanitent667@gmail.com
 
 ---
 
