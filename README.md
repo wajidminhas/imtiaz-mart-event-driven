@@ -227,7 +227,7 @@ MIT License
 ## 👨‍💻 Author
 
 **Wajid Shabbir Minhas**
-- GitHub: @wajidminhas
+- GitHub: https://github.com@wajidminhas
 - Email: shanitent667@gmail.com
 
 ---
