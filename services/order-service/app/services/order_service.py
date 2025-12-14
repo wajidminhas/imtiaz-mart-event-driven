@@ -35,34 +35,31 @@ class OrderService:
         OOP Principle: Service depends on abstraction (repository)
         """
         self.repository = repository
-        self.product_service_url = "http://localhost:3503/v1.0/invoke/product-service/method"
+        self.product_service_url = "http://imtiaz-product-service:8001"
     
     async def verify_product(self, product_id: int) -> dict:
-        """
-        Verify product exists and get details from Product Service
-        Uses Dapr service invocation for inter-service communication
-        """
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{self.product_service_url}/products/{product_id}",
-                    timeout=10.0
-                )
-                
-                if response.status_code == 404:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"Product {product_id} not found"
-                    )
-                
-                response.raise_for_status()
-                return response.json()
-                
-        except httpx.HTTPError as e:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Failed to verify product: {str(e)}"
+    """Verify product exists and get details from Product Service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.product_service_url}/products/{product_id}",
+                timeout=10.0
             )
+            
+            if response.status_code == 404:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Product {product_id} not found"
+                )
+            
+            response.raise_for_status()
+            return response.json()
+            
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to verify product: {str(e)}"
+        )
     
     async def calculate_order_total(self, items: List[OrderItemCreate]) -> tuple[float, List[dict]]:
         """

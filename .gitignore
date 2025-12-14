@@ -20,3 +20,11 @@ imtiaz-mart-event-driven/
 └── services/
     └── user-service/
         └── .env.example  ← Template (optional, for local dev)
+
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/.turbo
