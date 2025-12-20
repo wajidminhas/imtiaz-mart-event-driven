@@ -57,6 +57,32 @@ graph TB
     style Analytics fill:#e1d5e7,stroke:#9673a6
 ```
 
+## 🔗 Service Communication    
+
+All services communicate through **Dapr service mesh** for reliability and scalability:
+
+### Service-to-Service Calls
+```
+Order Service → Dapr (3503) → Product Service
+✓ Service discovery (no hardcoded IPs)
+✓ Automatic retries on failure
+✓ Load balancing
+```
+
+### Event-Driven Communication
+```
+Services → Dapr → Apache Kafka → Dapr → Consumer Services
+✓ Asynchronous processing
+✓ Loose coupling
+✓ Event replay capability
+```
+
+### Why Dapr?
+- **Resilience**: Built-in retry logic and circuit breakers
+- **Observability**: Distributed tracing out-of-the-box
+- **Security**: mTLS encryption between services
+- **Portability**: Switch between Kafka
+
 ## ✨ Features
 
 - **Event-Driven Architecture** - Asynchronous communication via Kafka
