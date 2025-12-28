@@ -30,7 +30,7 @@ class PaymentBase(SQLModel):
     Base Payment Schema - shared fields
     Used for inheritance by other schemas
     """
-    order_id: int = Field(foreign_key="orders.id", index=True)
+    order_id: int = Field(index=True)  # Removed foreign_key - microservice isolation
     user_id: int = Field(index=True)
     amount: float = Field(gt=0, description="Payment amount (must be positive)")
     currency: str = Field(default="PKR", max_length=3)
@@ -41,7 +41,7 @@ class PaymentBase(SQLModel):
     provider_payment_id: Optional[str] = Field(default=None, max_length=255)
     
     description: Optional[str] = Field(default=None, max_length=500)
-    payment_metadata: Optional[str] = Field(default=None)  # Changed from 'metadata'
+    payment_metadata: Optional[str] = Field(default=None)
 
 
 class Payment(PaymentBase, table=True):
