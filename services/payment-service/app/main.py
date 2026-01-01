@@ -53,7 +53,8 @@ async def root():
     return {
         "service": settings.app_name,
         "status": "running",
-        "version": "0.1.0"
+        "version": "0.1.0",
+        "port": 8002
     }
 
 
@@ -71,6 +72,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8003,  # Different port for payment service
+        port=8002,  # Payment service port
         reload=True
     )

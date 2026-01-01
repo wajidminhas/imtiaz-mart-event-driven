@@ -41,69 +41,52 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # ========================================
+  # PRODUCT SERVICE
+  # ========================================
   product-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: imtiaz-product-db
     networks:
       - imtiaz-network
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${PRODUCT_DB_NAME}
-    ports:
-      - "5437:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${PRODUCT_DB_NAME}
+      - PGPORT=${PRODUCT_DB_INTERNAL_PORT:-5432}
     volumes:
-      - product_db_data:/var/lib/postgresql/data
+      - product-db-data:/var/lib/postgresql/data
+    ports:
+      - "${PRODUCT_DB_EXTERNAL_PORT:-5437}:${PRODUCT_DB_INTERNAL_PORT:-5432}"  # ✅ Dynamic both sides
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${PRODUCT_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p ${PRODUCT_DB_INTERNAL_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  user-db:
-    image: postgres:15-alpine
-    container_name: imtiaz-user-db
-    networks:
-      - imtiaz-network
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${USER_DB_NAME}
-    ports:
-      - "5436:5432"
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${USER_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # ========================================
-  # PRODUCT SERVICE (FIXED)
-  # ========================================
   product-service:
     build:
       context: ../services/product-service
       dockerfile: Dockerfile
       args:
         VERSION: "1.0.0"
-        BUILD_DATE: "2025-11-09"
+        BUILD_DATE: "${BUILD_DATE:-2025-11-09}"
+        APP_PORT: "${PRODUCT_SERVICE_INTERNAL_PORT:-8001}"  # ✅ Pass to Dockerfile
     image: imtiaz-mart/product-service:1.0.0
     container_name: imtiaz-product-service
     networks:
       - imtiaz-network
     ports:
-      - "${PRODUCT_SERVICE_PORT:-8001}:8001"  # ✅ Fixed: 8001:8001
+      - "${PRODUCT_SERVICE_EXTERNAL_PORT:-8001}:${PRODUCT_SERVICE_INTERNAL_PORT:-8001}"  # ✅ Both dynamic!
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@product-db:5432/${PRODUCT_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@product-db:${PRODUCT_DB_INTERNAL_PORT:-5432}/${PRODUCT_DB_NAME}
       - APP_NAME=Product Service
-      - DEBUG=${DEBUG:-true}  # ✅ true for development
-      - DAPR_HTTP_PORT=3501
-      - DAPR_GRPC_PORT=50002
-      - PUBSUB_NAME=imtiaz-pubsub
+      - APP_PORT=${PRODUCT_SERVICE_INTERNAL_PORT:-8001}  # ✅ Dynamic
+      - DEBUG=${DEBUG:-true}
+      - DAPR_HTTP_PORT=${PRODUCT_DAPR_HTTP_PORT:-3501}  # ✅ Dynamic
+      - DAPR_GRPC_PORT=${PRODUCT_DAPR_GRPC_PORT:-50001}  # ✅ Dynamic
+      - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
       - ../services/product-service:/app
     depends_on:
@@ -111,55 +94,82 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      
     restart: unless-stopped
 
   product-service-dapr:
-    image: daprio/daprd:latest
+    image: daprio/daprd:${DAPR_VERSION:-latest}  # ✅ Dynamic version
     container_name: imtiaz-product-service-dapr
     command: [
       "./daprd",
       "-app-id", "product-service",
-      "-app-port", "8001",  # ✅ Fixed: Changed to 8001
-      "-dapr-http-port", "3501",
-      "-dapr-grpc-port", "50002",
+      "-app-port", "${PRODUCT_SERVICE_INTERNAL_PORT:-8001}",  # ✅ Dynamic
+      "-dapr-http-port", "${PRODUCT_DAPR_HTTP_PORT:-3501}",  # ✅ Dynamic
+      "-dapr-grpc-port", "${PRODUCT_DAPR_GRPC_PORT:-50001}",  # ✅ Dynamic
+      "-dapr-metrics-port", "${PRODUCT_DAPR_METRICS_PORT:-9091}",  # ✅ Dynamic
       "-components-path", "/components",
-      "-config", "/config/config.yaml",  # ✅ Added config
-      "-log-level", "debug"  # ✅ Changed to debug for troubleshooting
+      "-config", "/config/config.yaml",
+      "-log-level", "${DAPR_LOG_LEVEL:-debug}"  # ✅ Dynamic
     ]
     volumes:
       - ./dapr/components:/components:ro
-      - ./dapr/config.yaml:/config/config.yaml:ro  # ✅ Added config volume
+      - ./dapr/config.yaml:/config/config.yaml:ro
     depends_on:
       - product-service
       - kafka
     network_mode: "service:product-service"
     restart: unless-stopped
 
-  # ========================================
+   # ========================================
   # USER SERVICE
   # ========================================
+  user-db:
+    image: postgres:16-alpine
+    container_name: imtiaz-user-db
+    networks:
+      - imtiaz-network
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${USER_DB_NAME}
+      - PGPORT=${USER_DB_INTERNAL_PORT:-5432}
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    ports:
+      - "${USER_DB_EXTERNAL_PORT:-5436}:${USER_DB_INTERNAL_PORT:-5432}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p ${USER_DB_INTERNAL_PORT:-5432}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   user-service:
     build:
       context: ../services/user-service
       dockerfile: Dockerfile
       args:
         VERSION: "1.0.0"
+        BUILD_DATE: "${BUILD_DATE:-2025-12-27}"
+        APP_PORT: "${USER_SERVICE_INTERNAL_PORT:-8000}"
     image: imtiaz-mart/user-service:1.0.0
     container_name: imtiaz-user-service
     networks:
       - imtiaz-network
     ports:
-      - "${USER_SERVICE_PORT:-8000}:8000"
+      - "${USER_SERVICE_EXTERNAL_PORT:-8000}:${USER_SERVICE_INTERNAL_PORT:-8000}"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:5432/${USER_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@user-db:${USER_DB_INTERNAL_PORT:-5432}/${USER_DB_NAME}
       - APP_NAME=User Service
-      - DEBUG=${DEBUG:-true}  # ✅ Changed to true for dev
-      - DAPR_HTTP_PORT=3500
-      - DAPR_GRPC_PORT=50001
-      - PUBSUB_NAME=imtiaz-pubsub
+      - APP_PORT=${USER_SERVICE_INTERNAL_PORT:-8000}
+      - DEBUG=${DEBUG:-true}
+      - DAPR_HTTP_PORT=${USER_DAPR_HTTP_PORT:-3500}
+      - DAPR_GRPC_PORT=${USER_DAPR_GRPC_PORT:-50000}
+      - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
+      - SECRET_KEY=${USER_SERVICE_SECRET_KEY}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
     volumes:
-      - ../services/user-service/uv.lock:/app/uv.lock
+      - ../services/user-service:/app
     depends_on:
       user-db:
         condition: service_healthy
@@ -168,74 +178,76 @@ services:
     restart: unless-stopped
 
   user-service-dapr:
-    image: daprio/daprd:latest
+    image: daprio/daprd:${DAPR_VERSION:-latest}
     container_name: imtiaz-user-service-dapr
     command: [
       "./daprd",
       "-app-id", "user-service",
-      "-app-port", "8000",
-      "-dapr-http-port", "3500",
-      "-dapr-grpc-port", "50001",
+      "-app-port", "${USER_SERVICE_INTERNAL_PORT:-8000}",
+      "-dapr-http-port", "${USER_DAPR_HTTP_PORT:-3500}",
+      "-dapr-grpc-port", "${USER_DAPR_GRPC_PORT:-50000}",
+      "-dapr-metrics-port", "${USER_DAPR_METRICS_PORT:-9090}",
       "-components-path", "/components",
-      "-config", "/config/config.yaml",  # ✅ Added config
-      "-log-level", "debug"  # ✅ Changed to debug
+      "-config", "/config/config.yaml",
+      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
     ]
     volumes:
       - ./dapr/components:/components:ro
-      - ./dapr/config.yaml:/config/config.yaml:ro  # ✅ Added config volume
+      - ./dapr/config.yaml:/config/config.yaml:ro
     depends_on:
       - user-service
       - kafka
     network_mode: "service:user-service"
     restart: unless-stopped
+
   # ========================================
-  # ORDER DATABASE
+  # ORDER SERVICE
   # ========================================
   order-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: imtiaz-order-db
     networks:
       - imtiaz-network
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${ORDER_DB_NAME}
-    ports:
-      - "5438:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${ORDER_DB_NAME}
+      - PGPORT=${ORDER_DB_INTERNAL_PORT:-5432}
     volumes:
-      - order_db_data:/var/lib/postgresql/data
+      - order-db-data:/var/lib/postgresql/data
+    ports:
+      - "${ORDER_DB_EXTERNAL_PORT:-5438}:${ORDER_DB_INTERNAL_PORT:-5432}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${ORDER_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p ${ORDER_DB_INTERNAL_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # ========================================
-  # ORDER SERVICE
-  # ========================================
   order-service:
     build:
       context: ../services/order-service
       dockerfile: Dockerfile
       args:
         VERSION: "1.0.0"
-        BUILD_DATE: "2025-11-29"
+        BUILD_DATE: "${BUILD_DATE:-2025-12-27}"
+        APP_PORT: "${ORDER_SERVICE_INTERNAL_PORT:-8003}"
     image: imtiaz-mart/order-service:1.0.0
     container_name: imtiaz-order-service
     networks:
       - imtiaz-network
     ports:
-      - "${ORDER_SERVICE_PORT:-8003}:8003"
+      - "${ORDER_SERVICE_EXTERNAL_PORT:-8003}:${ORDER_SERVICE_INTERNAL_PORT:-8003}"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@order-db:5432/${ORDER_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@order-db:${ORDER_DB_INTERNAL_PORT:-5432}/${ORDER_DB_NAME}
       - APP_NAME=Order Service
+      - APP_PORT=${ORDER_SERVICE_INTERNAL_PORT:-8003}
       - DEBUG=${DEBUG:-true}
-      - DAPR_HTTP_PORT=3503
-      - DAPR_GRPC_PORT=50004
-      - PUBSUB_NAME=imtiaz-pubsub
+      - DAPR_HTTP_PORT=${ORDER_DAPR_HTTP_PORT:-3503}
+      - DAPR_GRPC_PORT=${ORDER_DAPR_GRPC_PORT:-50003}
+      - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
-      - ../services/order-service/uv.lock:/app/uv.lock
+      - ../services/order-service:/app
     depends_on:
       order-db:
         condition: service_healthy
@@ -244,17 +256,18 @@ services:
     restart: unless-stopped
 
   order-service-dapr:
-    image: daprio/daprd:latest
+    image: daprio/daprd:${DAPR_VERSION:-latest}
     container_name: imtiaz-order-service-dapr
     command: [
       "./daprd",
       "-app-id", "order-service",
-      "-app-port", "8003",
-      "-dapr-http-port", "3503",
-      "-dapr-grpc-port", "50004",
+      "-app-port", "${ORDER_SERVICE_INTERNAL_PORT:-8003}",
+      "-dapr-http-port", "${ORDER_DAPR_HTTP_PORT:-3503}",
+      "-dapr-grpc-port", "${ORDER_DAPR_GRPC_PORT:-50003}",
+      "-dapr-metrics-port", "${ORDER_DAPR_METRICS_PORT:-9093}",
       "-components-path", "/components",
       "-config", "/config/config.yaml",
-      "-log-level", "info"
+      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
     ]
     volumes:
       - ./dapr/components:/components:ro
@@ -264,55 +277,55 @@ services:
       - kafka
     network_mode: "service:order-service"
     restart: unless-stopped
-  
+
   # ========================================
-  # INVENTORY DATABASE
+  # INVENTORY SERVICE
   # ========================================
   inventory-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: imtiaz-inventory-db
     networks:
       - imtiaz-network
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${INVENTORY_DB_NAME}
-    ports:
-      - "5439:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${INVENTORY_DB_NAME}
+      - PGPORT=${INVENTORY_DB_INTERNAL_PORT:-5432}
     volumes:
-      - inventory_db_data:/var/lib/postgresql/data
+      - inventory-db-data:/var/lib/postgresql/data
+    ports:
+      - "${INVENTORY_DB_EXTERNAL_PORT:-5439}:${INVENTORY_DB_INTERNAL_PORT:-5432}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${INVENTORY_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p ${INVENTORY_DB_INTERNAL_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # ========================================
-  # INVENTORY SERVICE
-  # ========================================
   inventory-service:
     build:
       context: ../services/inventory-service
       dockerfile: Dockerfile
       args:
         VERSION: "1.0.0"
-        BUILD_DATE: "2025-12-11"
+        BUILD_DATE: "${BUILD_DATE:-2025-12-27}"
+        APP_PORT: "${INVENTORY_SERVICE_INTERNAL_PORT:-8004}"
     image: imtiaz-mart/inventory-service:1.0.0
     container_name: imtiaz-inventory-service
     networks:
       - imtiaz-network
     ports:
-      - "${INVENTORY_SERVICE_PORT:-8004}:8004"
+      - "${INVENTORY_SERVICE_EXTERNAL_PORT:-8004}:${INVENTORY_SERVICE_INTERNAL_PORT:-8004}"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@inventory-db:5432/${INVENTORY_DB_NAME}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@inventory-db:${INVENTORY_DB_INTERNAL_PORT:-5432}/${INVENTORY_DB_NAME}
       - APP_NAME=Inventory Service
+      - APP_PORT=${INVENTORY_SERVICE_INTERNAL_PORT:-8004}
       - DEBUG=${DEBUG:-true}
-      - DAPR_HTTP_PORT=3504
-      - DAPR_GRPC_PORT=50005
-      - PUBSUB_NAME=imtiaz-pubsub
+      - DAPR_HTTP_PORT=${INVENTORY_DAPR_HTTP_PORT:-3504}
+      - DAPR_GRPC_PORT=${INVENTORY_DAPR_GRPC_PORT:-50004}
+      - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
-      - ../services/inventory-service/uv.lock:/app/uv.lock
+      - ../services/inventory-service:/app
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -321,17 +334,18 @@ services:
     restart: unless-stopped
 
   inventory-service-dapr:
-    image: daprio/daprd:latest
+    image: daprio/daprd:${DAPR_VERSION:-latest}
     container_name: imtiaz-inventory-service-dapr
     command: [
       "./daprd",
       "-app-id", "inventory-service",
-      "-app-port", "8004",
-      "-dapr-http-port", "3504",
-      "-dapr-grpc-port", "50005",
+      "-app-port", "${INVENTORY_SERVICE_INTERNAL_PORT:-8004}",
+      "-dapr-http-port", "${INVENTORY_DAPR_HTTP_PORT:-3504}",
+      "-dapr-grpc-port", "${INVENTORY_DAPR_GRPC_PORT:-50004}",
+      "-dapr-metrics-port", "${INVENTORY_DAPR_METRICS_PORT:-9094}",
       "-components-path", "/components",
       "-config", "/config/config.yaml",
-      "-log-level", "info"
+      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
     ]
     volumes:
       - ./dapr/components:/components:ro
@@ -342,8 +356,101 @@ services:
     network_mode: "service:inventory-service"
     restart: unless-stopped
 
+# ========================================
+  # PAYMENT SERVICE
+  # ========================================
+  payment-db:
+    image: postgres:16-alpine
+    container_name: imtiaz-payment-db
+    networks:
+      - imtiaz-network
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${PAYMENT_DB_NAME}
+      - PGPORT=${PAYMENT_DB_INTERNAL_PORT:-5432}
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    ports:
+      - "${PAYMENT_DB_EXTERNAL_PORT:-5440}:${PAYMENT_DB_INTERNAL_PORT:-5432}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -p ${PAYMENT_DB_INTERNAL_PORT:-5432}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ../services/payment-service
+      dockerfile: Dockerfile
+      args:
+        VERSION: "1.0.0"
+        BUILD_DATE: "${BUILD_DATE:-2025-12-27}"
+        APP_PORT: "${PAYMENT_SERVICE_INTERNAL_PORT:-8002}"
+    image: imtiaz-mart/payment-service:1.0.0
+    container_name: imtiaz-payment-service
+    networks:
+      - imtiaz-network
+    ports:
+      - "${PAYMENT_SERVICE_EXTERNAL_PORT:-8002}:${PAYMENT_SERVICE_INTERNAL_PORT:-8002}"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@payment-db:${PAYMENT_DB_INTERNAL_PORT:-5432}/${PAYMENT_DB_NAME}
+      - APP_NAME=Payment Service
+      - APP_PORT=${PAYMENT_SERVICE_INTERNAL_PORT:-8002}
+      - DEBUG=${DEBUG:-true}
+      - DAPR_HTTP_PORT=${PAYMENT_DAPR_HTTP_PORT:-3502}
+      - DAPR_GRPC_PORT=${PAYMENT_DAPR_GRPC_PORT:-50002}
+      - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
+      - PAYFAST_MERCHANT_ID=${PAYFAST_MERCHANT_ID}
+      - PAYFAST_MERCHANT_KEY=${PAYFAST_MERCHANT_KEY}
+      - PAYFAST_PASSPHRASE=${PAYFAST_PASSPHRASE}
+      - PAYFAST_URL=${PAYFAST_URL}
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    volumes:
+      - ../services/payment-service:/app
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  payment-service-dapr:
+    image: daprio/daprd:${DAPR_VERSION:-latest}
+    container_name: imtiaz-payment-service-dapr
+    command: [
+      "./daprd",
+      "-app-id", "payment-service",
+      "-app-port", "${PAYMENT_SERVICE_INTERNAL_PORT:-8002}",
+      "-dapr-http-port", "${PAYMENT_DAPR_HTTP_PORT:-3502}",
+      "-dapr-grpc-port", "${PAYMENT_DAPR_GRPC_PORT:-50002}",
+      "-dapr-metrics-port", "${PAYMENT_DAPR_METRICS_PORT:-9092}",
+      "-components-path", "/components",
+      "-config", "/config/config.yaml",
+      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
+    ]
+    volumes:
+      - ./dapr/components:/components:ro
+      - ./dapr/config.yaml:/config/config.yaml:ro
+    depends_on:
+      - payment-service
+      - kafka
+    network_mode: "service:payment-service"
+    restart: unless-stopped
+
+# ========================================
+# VOLUMES (Add these at the bottom of docker-compose.yml)
+# ========================================
 volumes:
-  product_db_data:
-  user_db_data:
-  order_db_data:
-  inventory_db_data:
+  user-db-data:
+    name: imtiaz-user-db-data
+  order-db-data:
+    name: imtiaz-order-db-data
+  inventory-db-data:
+    name: imtiaz-inventory-db-data
+  product-db-data:
+    name: imtiaz-product-db-data
+  payment-db-data:
+    name: imtiaz-payment-db-data

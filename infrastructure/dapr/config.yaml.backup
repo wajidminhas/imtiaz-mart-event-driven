@@ -1,0 +1,35 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: daprConfig
+  namespace: default
+spec:
+  # Tracing configuration (optional - for debugging)
+  tracing:
+    samplingRate: "1"  # 100% sampling in development
+    zipkin:
+      endpointAddress: "http://zipkin:9411/api/v2/spans"  # If you add Zipkin later
+  
+  # Enable metrics
+  metric:
+    enabled: true
+  
+  # Access control - allow all in development
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+  
+  # API configuration
+  api:
+    allowed:
+      - name: state
+        version: v1
+        protocol: grpc
+      - name: pubsub
+        version: v1
+        protocol: grpc
+  
+  # Features
+  features:
+    - name: pubsub.outbox
+      enabled: false  # Disable for now (advanced feature)

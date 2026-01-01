@@ -9,8 +9,18 @@ spec:
   - name: brokers
     value: "kafka:29092"
   - name: consumerGroup
-    value: "product-service-group"
+    value: "imtiaz-services-group"  # ✅ Generic group name
   - name: clientId
-    value: "product-service"
+    value: "imtiaz-mart"  # ✅ Generic client ID
   - name: authType
     value: "none"
+  - name: maxMessageBytes
+    value: "1048576"  # 1MB max message size
+  - name: initialOffset
+    value: "newest"  # Start from newest messages
+scopes:
+  - product-service
+  - payment-service
+  - order-service
+  - user-service
+  - inventory-service
