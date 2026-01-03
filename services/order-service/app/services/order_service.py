@@ -38,13 +38,13 @@ class OrderService:
         self.product_service_url = "http://imtiaz-product-service:8001"
     
     async def verify_product(self, product_id: int) -> dict:
-    """Verify product exists and get details from Product Service"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.product_service_url}/products/{product_id}",
-                timeout=10.0
-            )
+        """Verify product exists and get details from Product Service"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.product_service_url}/products/{product_id}",
+                    timeout=10.0
+                )
             
             if response.status_code == 404:
                 raise HTTPException(
@@ -55,11 +55,11 @@ class OrderService:
             response.raise_for_status()
             return response.json()
             
-    except httpx.HTTPError as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Failed to verify product: {str(e)}"
-        )
+        except httpx.HTTPError as e:
+            raise HTTPException(
+               status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+              detail=f"Failed to verify product: {str(e)}"
+            )
     
     async def calculate_order_total(self, items: List[OrderItemCreate]) -> tuple[float, List[dict]]:
         """
