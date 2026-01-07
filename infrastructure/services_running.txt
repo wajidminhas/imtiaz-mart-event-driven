@@ -1,0 +1,18 @@
+NAMES                           STATUS                   PORTS
+imtiaz-inventory-service-dapr   Up About a minute        
+imtiaz-order-service-dapr       Up About a minute        
+imtiaz-payment-service-dapr     Up About a minute        
+imtiaz-product-service-dapr     Up About a minute        
+imtiaz-user-service-dapr        Up About a minute        
+imtiaz-payment-service          Up About a minute        0.0.0.0:8002->8002/tcp, [::]:8002->8002/tcp
+imtiaz-user-service             Up About a minute        0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+imtiaz-product-service          Up 2 minutes             0.0.0.0:8001->8001/tcp, [::]:8001->8001/tcp
+imtiaz-order-service            Up About a minute        0.0.0.0:8003->8003/tcp, [::]:8003->8003/tcp
+imtiaz-inventory-service        Up About a minute        0.0.0.0:8004->8004/tcp, [::]:8004->8004/tcp
+imtiaz-kafka                    Up 2 minutes (healthy)   0.0.0.0:9092->9092/tcp, [::]:9092->9092/tcp
+imtiaz-zookeeper                Up 2 minutes             2181/tcp, 2888/tcp, 3888/tcp
+imtiaz-inventory-db             Up 2 minutes (healthy)   0.0.0.0:5439->5432/tcp, [::]:5439->5432/tcp
+imtiaz-product-db               Up 2 minutes (healthy)   0.0.0.0:5437->5432/tcp, [::]:5437->5432/tcp
+imtiaz-user-db                  Up 2 minutes (healthy)   0.0.0.0:5436->5432/tcp, [::]:5436->5432/tcp
+imtiaz-payment-db               Up 2 minutes (healthy)   0.0.0.0:5440->5432/tcp, [::]:5440->5432/tcp
+imtiaz-order-db                 Up 2 minutes (healthy)   0.0.0.0:5438->5432/tcp, [::]:5438->5432/tcp
