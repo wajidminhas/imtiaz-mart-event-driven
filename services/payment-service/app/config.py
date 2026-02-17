@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     
     # Dapr Settings
-    pubsub_name: str = "imtiaz-mart-pubsub"
+    pubsub_name: str = "imtiaz-pubsub"
     dapr_grpc_port: int = 50001
     dapr_http_port: int = 3500
     

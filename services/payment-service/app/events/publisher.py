@@ -15,7 +15,7 @@ class EventPublisher:
     
     def __init__(self):
         """Initialize Dapr endpoint"""
-        self.pubsub_name = "imtiaz-mart-pubsub"  # Match your other services
+        self.pubsub_name = settings.pubsub_name  # ✅ Use from config instead of hardcoding
         self.dapr_http_endpoint = f"http://localhost:{settings.dapr_http_port}"
     
     def publish_event(

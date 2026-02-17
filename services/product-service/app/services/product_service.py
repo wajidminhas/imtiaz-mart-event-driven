@@ -157,8 +157,8 @@ class ProductService:
         
         if not updated_product:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update product"
+                status_code=404,
+                detail=f"Product with ID {product_id} not found"
             )
         
         # Publish product.updated event 🔥 NEW!

@@ -1,21 +1,23 @@
-FROM python:3.11-slim
 
-# Install uv package manager
-RUN pip install --no-cache-dir uv
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml ./
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Install dependencies - uv will create .venv automatically
-RUN uv sync --no-dev
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Create venv and install dependencies IN the container
+RUN uv venv && uv sync
 
 # Copy application code
 COPY . .
 
-# Expose order service port
+# Use the container's venv
+ENV PATH="/app/.venv/bin:$PATH"
+
 EXPOSE 8003
 
-# Run the application
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]

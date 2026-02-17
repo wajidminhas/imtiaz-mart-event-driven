@@ -1,38 +1,33 @@
-version: '3.8'
+
 
 networks:
   imtiaz-network:
     driver: bridge
 
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: imtiaz-zookeeper
-    networks:
-      - imtiaz-network
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    restart: unless-stopped
+  
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: imtiaz-kafka
     networks:
       - imtiaz-network
-    depends_on:
-      - zookeeper
     ports:
       - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:29093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 10s
@@ -40,6 +35,28 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+
+
+  # Add this NEW service right here ⬇️
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: imtiaz-kafka-ui
+    networks:
+      - imtiaz-network
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: imtiaz-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      # Remove ZOOKEEPER line
+    depends_on:
+      - kafka
+    restart: unless-stopped  
+
+  # Then your product-db service continues below...
+  #product-db:
+    #image: postgres:16-alpine
+    # ...
 
   # ========================================
   # PRODUCT SERVICE
@@ -97,19 +114,9 @@ services:
     restart: unless-stopped
 
   product-service-dapr:
-    image: daprio/daprd:${DAPR_VERSION:-latest}  # ✅ Dynamic version
+    image: daprio/daprd:latest
     container_name: imtiaz-product-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "product-service",
-      "-app-port", "${PRODUCT_SERVICE_INTERNAL_PORT:-8001}",  # ✅ Dynamic
-      "-dapr-http-port", "${PRODUCT_DAPR_HTTP_PORT:-3501}",  # ✅ Dynamic
-      "-dapr-grpc-port", "${PRODUCT_DAPR_GRPC_PORT:-50001}",  # ✅ Dynamic
-      "-dapr-metrics-port", "${PRODUCT_DAPR_METRICS_PORT:-9091}",  # ✅ Dynamic
-      "-components-path", "/components",
-      "-config", "/config/config.yaml",
-      "-log-level", "${DAPR_LOG_LEVEL:-debug}"  # ✅ Dynamic
-    ]
+    command: ./daprd -app-id product-service -app-port 8001 -dapr-http-port 3501 -dapr-grpc-port 50001 -components-path /components -config /config/config.yaml -log-level debug
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config.yaml:/config/config.yaml:ro
@@ -178,19 +185,9 @@ services:
     restart: unless-stopped
 
   user-service-dapr:
-    image: daprio/daprd:${DAPR_VERSION:-latest}
+    image: daprio/daprd:latest
     container_name: imtiaz-user-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "user-service",
-      "-app-port", "${USER_SERVICE_INTERNAL_PORT:-8000}",
-      "-dapr-http-port", "${USER_DAPR_HTTP_PORT:-3500}",
-      "-dapr-grpc-port", "${USER_DAPR_GRPC_PORT:-50000}",
-      "-dapr-metrics-port", "${USER_DAPR_METRICS_PORT:-9090}",
-      "-components-path", "/components",
-      "-config", "/config/config.yaml",
-      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
-    ]
+    command: ./daprd -app-id user-service -app-port 8000 -dapr-http-port 3500 -dapr-grpc-port 50000 -components-path /components -config /config/config.yaml -log-level debug
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config.yaml:/config/config.yaml:ro
@@ -256,19 +253,9 @@ services:
     restart: unless-stopped
 
   order-service-dapr:
-    image: daprio/daprd:${DAPR_VERSION:-latest}
+    image: daprio/daprd:latest
     container_name: imtiaz-order-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "order-service",
-      "-app-port", "${ORDER_SERVICE_INTERNAL_PORT:-8003}",
-      "-dapr-http-port", "${ORDER_DAPR_HTTP_PORT:-3503}",
-      "-dapr-grpc-port", "${ORDER_DAPR_GRPC_PORT:-50003}",
-      "-dapr-metrics-port", "${ORDER_DAPR_METRICS_PORT:-9093}",
-      "-components-path", "/components",
-      "-config", "/config/config.yaml",
-      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
-    ]
+    command: ./daprd -app-id order-service -app-port 8003 -dapr-http-port 3503 -dapr-grpc-port 50003 -components-path /components -config /config/config.yaml -log-level debug
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config.yaml:/config/config.yaml:ro
@@ -334,19 +321,9 @@ services:
     restart: unless-stopped
 
   inventory-service-dapr:
-    image: daprio/daprd:${DAPR_VERSION:-latest}
+    image: daprio/daprd:latest
     container_name: imtiaz-inventory-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "inventory-service",
-      "-app-port", "${INVENTORY_SERVICE_INTERNAL_PORT:-8004}",
-      "-dapr-http-port", "${INVENTORY_DAPR_HTTP_PORT:-3504}",
-      "-dapr-grpc-port", "${INVENTORY_DAPR_GRPC_PORT:-50004}",
-      "-dapr-metrics-port", "${INVENTORY_DAPR_METRICS_PORT:-9094}",
-      "-components-path", "/components",
-      "-config", "/config/config.yaml",
-      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
-    ]
+    command: ./daprd -app-id inventory-service -app-port 8004 -dapr-http-port 3504 -dapr-grpc-port 50004 -components-path /components -config /config/config.yaml -log-level debug
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config.yaml:/config/config.yaml:ro
@@ -420,17 +397,7 @@ services:
   payment-service-dapr:
     image: daprio/daprd:${DAPR_VERSION:-latest}
     container_name: imtiaz-payment-service-dapr
-    command: [
-      "./daprd",
-      "-app-id", "payment-service",
-      "-app-port", "${PAYMENT_SERVICE_INTERNAL_PORT:-8002}",
-      "-dapr-http-port", "${PAYMENT_DAPR_HTTP_PORT:-3502}",
-      "-dapr-grpc-port", "${PAYMENT_DAPR_GRPC_PORT:-50002}",
-      "-dapr-metrics-port", "${PAYMENT_DAPR_METRICS_PORT:-9092}",
-      "-components-path", "/components",
-      "-config", "/config/config.yaml",
-      "-log-level", "${DAPR_LOG_LEVEL:-debug}"
-    ]
+    command: ./daprd -app-id payment-service -app-port 8002 -dapr-http-port 3502 -dapr-grpc-port 50002 -components-path /components -config /config/config.yaml -log-level debug
     volumes:
       - ./dapr/components:/components:ro
       - ./dapr/config.yaml:/config/config.yaml:ro

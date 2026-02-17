@@ -81,7 +81,7 @@ class TestPaymentAPI:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "running"
+        assert data["status"] == "healthy"
     
     def test_create_payment(self, client):
         """Test creating a payment via API"""

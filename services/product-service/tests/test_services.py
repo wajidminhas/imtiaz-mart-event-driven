@@ -79,15 +79,15 @@ async def test_get_all_products_including_inactive(product_service, create_sampl
     assert len(products) == 2
 
 
-@pytest.mark.asyncio
-async def test_update_product_success(product_service, create_sample_product):
+
+def test_update_product_success(product_service, create_sample_product):
     """Test updating product through service"""
     # Create product
     product = create_sample_product(name="Old Name", price=1000.0)
     
     # Update
     update_data = ProductUpdate(name="New Name", price=2000.0)
-    updated = await product_service.update_product(product.id, update_data)
+    updated =  product_service.update_product(product.id, update_data)
     
     assert updated.name == "New Name"
     assert updated.price == 2000.0
@@ -104,14 +104,14 @@ async def test_update_nonexistent_product(product_service):
     assert exc_info.value.status_code == 404
 
 
-@pytest.mark.asyncio
-async def test_delete_product_success(product_service, create_sample_product):
+
+def test_delete_product_success(product_service, create_sample_product):
     """Test deleting product (soft delete)"""
     # Create product
     product = create_sample_product(name="To Delete")
     
     # Delete
-    result = await product_service.delete_product(product.id)
+    result =  product_service.delete_product(product.id)
     
     assert result["product_id"] == product.id
     assert "deleted successfully" in result["message"]
