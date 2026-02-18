@@ -1,4 +1,3 @@
-
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -6,18 +5,13 @@ WORKDIR /app
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
-
-# Create venv and install dependencies IN the container
-RUN uv venv && uv sync
-
-# Copy application code
+# Copy everything
 COPY . .
 
-# Use the container's venv
-ENV PATH="/app/.venv/bin:$PATH"
+# Install dependencies
+RUN uv sync
 
 EXPOSE 8003
 
+# Use uv run
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003", "--reload"]
