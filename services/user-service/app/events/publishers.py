@@ -29,25 +29,28 @@ class EventPublisher:
         self.dapr_port = dapr_port
         self.pubsub_name = PUBSUB_NAME
     
-    def publish_user_registered(self, user_id: Optional[int] , email: str, first_name: str, last_name: str):
+    def publish_user_registered(self, user_id: Optional[int], email: str, first_name: str, last_name: str):
         """Publish user registered event"""
         if user_id is None:
             print("⚠️ Skipping publish: user_id is None")
             return False
-        event = UserRegistered()
-        event.user_id = user_id
-        event.email = email
-        event.first_name = first_name
-        event.last_name = last_name
-        event.timestamp = int(datetime.now().timestamp())
-        
-        # Serialize to bytes
-        event_data = event.SerializeToString()
-        
-        # Publish via Dapr
-        dapr_url = f"http://localhost:{self.dapr_port}/v1.0/publish/{self.pubsub_name}/{TOPIC_NAME}"
         
         try:
+            event = UserRegistered()
+            
+            # user_id is STRING in protobuf, timestamp is INT64
+            event.user_id = str(user_id)  # ✅ STRING not int
+            event.email = email
+            event.first_name = first_name
+            event.last_name = last_name
+            event.timestamp = int(datetime.utcnow().timestamp() * 1000)  # ✅ INT64 (milliseconds)
+            
+            # Serialize to bytes
+            event_data = event.SerializeToString()
+            
+            # Publish via Dapr
+            dapr_url = f"http://localhost:{self.dapr_port}/v1.0/publish/{self.pubsub_name}/{TOPIC_NAME}"
+            
             response = requests.post(
                 dapr_url,
                 data=event_data,
@@ -59,10 +62,11 @@ class EventPublisher:
             print(f"✅ Published event: user.registered for user_id={user_id}")
             return True
             
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"❌ Failed to publish event: {e}")
+            import traceback
+            traceback.print_exc()
             return False
-
 
 # Create singleton instance
 event_publisher = EventPublisher()
