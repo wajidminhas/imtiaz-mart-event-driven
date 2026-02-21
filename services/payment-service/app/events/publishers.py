@@ -1,49 +1,52 @@
-"""
-Event Publishers for User Service
-Publishes events to Kafka via Dapr
-"""
-
 import sys
-import requests
 from pathlib import Path
 from datetime import datetime
+import requests
 from typing import Optional
 
-# Add shared proto folder to Python path
+# Add shared proto path
 shared_proto_path = Path(__file__).parent.parent.parent.parent.parent / "shared" / "proto"
 sys.path.insert(0, str(shared_proto_path))
 
 # Import the generated protobuf class
-from user_registered_pb2 import UserRegistered
+from payment_completed_pb2 import PaymentCompleted
 
 # Dapr configuration
-DAPR_HTTP_PORT = 3500
+DAPR_HTTP_PORT = 3502  # Payment service Dapr port
 PUBSUB_NAME = "imtiaz-pubsub"
-TOPIC_NAME = "user.registered"
+TOPIC_NAME = "payment.completed"
 
 
 class EventPublisher:
-    """Centralized event publisher for user service"""
+    """Centralized event publisher for payment service"""
     
     def __init__(self, dapr_port: int = DAPR_HTTP_PORT):
         self.dapr_port = dapr_port
         self.pubsub_name = PUBSUB_NAME
     
-    def publish_user_registered(self, user_id: Optional[int], email: str, first_name: str, last_name: str):
-        """Publish user registered event"""
-        if user_id is None:
-            print("⚠️ Skipping publish: user_id is None")
+    def publish_payment_completed(
+        self, 
+        payment_id: int, 
+        order_id: int, 
+        amount: float, 
+        payment_method: str,
+        status: str
+    ):
+        """Publish payment completed event"""
+        if payment_id is None:
+            print("⚠️ Skipping publish: payment_id is None")
             return False
         
         try:
-            event = UserRegistered()
+            event = PaymentCompleted()
             
-            # user_id is STRING in protobuf, timestamp is INT64
-            event.user_id = str(user_id)  # ✅ STRING not int
-            event.email = email
-            event.first_name = first_name
-            event.last_name = last_name
-            event.timestamp = int(datetime.utcnow().timestamp() * 1000)  # ✅ INT64 (milliseconds)
+            # Set fields (convert types to match protobuf)
+            event.payment_id = str(payment_id)
+            event.order_id = str(order_id)
+            event.amount = float(amount)
+            event.payment_method = str(payment_method)
+            event.status = str(status)
+            event.timestamp = int(datetime.utcnow().timestamp() * 1000)
             
             # Serialize to bytes
             event_data = event.SerializeToString()
@@ -59,7 +62,7 @@ class EventPublisher:
             )
             response.raise_for_status()
             
-            print(f"✅ Published event: user.registered for user_id={user_id}")
+            print(f"✅ Published event: {TOPIC_NAME} for payment_id={payment_id}")
             return True
             
         except Exception as e:
@@ -68,5 +71,6 @@ class EventPublisher:
             traceback.print_exc()
             return False
 
-# Create singleton instance
+
+# Global instance
 event_publisher = EventPublisher()

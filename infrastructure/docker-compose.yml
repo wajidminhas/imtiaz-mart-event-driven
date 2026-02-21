@@ -106,6 +106,8 @@ services:
       - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
       - ../services/product-service:/app
+      - ../shared/proto:/shared/proto
+      - /app/.venv
     depends_on:
       product-db:
         condition: service_healthy
@@ -177,6 +179,8 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
     volumes:
       - ../services/user-service:/app
+      - ../shared/proto:/shared/proto
+      - /app/.venv
     depends_on:
       user-db:
         condition: service_healthy
@@ -245,6 +249,8 @@ services:
       - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
       - ../services/order-service:/app
+      - ../shared/proto:/shared/proto
+      - /app/.venv
     depends_on:
       order-db:
         condition: service_healthy
@@ -313,6 +319,8 @@ services:
       - PUBSUB_NAME=${PUBSUB_NAME:-imtiaz-pubsub}
     volumes:
       - ../services/inventory-service:/app
+      - ../shared/proto:/shared/proto
+      - /app/.venv
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -387,6 +395,8 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
     volumes:
       - ../services/payment-service:/app
+      - ../shared/proto:/shared/proto
+      - /app/.venv
     depends_on:
       payment-db:
         condition: service_healthy
