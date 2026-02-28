@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Dapr Settings
     pubsub_name: str = "imtiaz-pubsub"
     dapr_grpc_port: int = 50001
-    dapr_http_port: int = 3500
+    dapr_http_port: int = 3502
     
     model_config = SettingsConfigDict(
         env_file=".env",
